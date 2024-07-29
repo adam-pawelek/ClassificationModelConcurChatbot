@@ -1,3 +1,5 @@
+import copy
+
 import openai
 import os
 from PyPDF2 import PdfReader
@@ -5,7 +7,7 @@ import json
 
 CHATGPT_MODEL = "gpt-4o"
 client = None
-MAX_LENGTH = 1000
+MAX_LENGTH = 4096
 
 
 def set_openai_api_key(api_key):
@@ -62,6 +64,54 @@ def generate_questions_from_text(text, num_questions=20):
     return synthetic_data
 
 
+
+def create_answer(question, text):
+    messages = [
+        {"role": "system", "content": "Your job is to create an answer based on the provided question"},
+        {"role": "user",
+         "content": f"Answer question '{question}' based on the following text:\n{text}\nEnsure the response is in the following JSON format: {{\"role\": \"system\", \"content\": \"Answer for question\"}}, IMPORTANT -> don't write ```json in answer"}
+    ]
+    response = client.chat.completions.create(
+        model=CHATGPT_MODEL,
+        messages=messages,
+        max_tokens=MAX_LENGTH,
+    )
+
+    try:
+        print(response.choices[0].message.content)
+        synthetic_data = json.loads(response.choices[0].message.content)
+        print(synthetic_data)
+    except json.JSONDecodeError:
+        try:
+            print("Response not in JSON format. Asking ChatGPT to correct it.")
+            correction_messages = [
+                {"role": "system", "content": "Your job is to correct the format of the questions. and answer"},
+                {"role": "user",
+                    "content": f"The previous response was not in the correct format. Ensure the response is in the following JSON format: {{\"role\": \"system\", \"content\": \"Answer for question\"}}\n Here are the answer to reformat:\n{copy.deepcopy(response.choices[0].message.content)} use \n instead of newline. it should be later converted to json, IMPORTANT -> don't write ```json in answer"
+                 }
+            ]
+
+            response = client.chat.completions.create(
+                model=CHATGPT_MODEL,
+                messages=correction_messages,
+                max_tokens=MAX_LENGTH,
+            )
+            print("Error")
+            print(response.choices[0].message.content)
+            synthetic_data = json.loads(response.choices[0].message.content)
+            return synthetic_data
+        except json.JSONDecodeError:
+            text = """
+            {
+                "role": "system",
+                "content": "I'm sorry I don't know how to answer this question."        
+            }
+            """
+            return json.loads(text)
+
+
+
+
 def main():
     folder_path = 'tutorials'
     all_synthetic_data = []
@@ -72,13 +122,18 @@ def main():
             print(f'Extracting text from: {filename}')
             text_content = extract_text_from_pdf(pdf_path)
             synthetic_data = generate_questions_from_text(text_content)
+            #synthetic_data = json.loads(synthetic_data, indent=4)
+            print("lenght of synthetic_data", len(synthetic_data))
+            for indx, syn_data in enumerate(synthetic_data):
+                print(syn_data)
+                print(indx)
+                synthetic_answer = create_answer(syn_data[0], text_content)
+
             all_synthetic_data.extend(synthetic_data)
-            print(json.dumps(synthetic_data, indent=4))
+            print(synthetic_data)
             print('\n' + '-' * 80 + '\n')
 
-    # Save the synthetic data to a file
-    with open('synthetic_data.json', 'w') as outfile:
-        json.dump(all_synthetic_data, outfile, indent=4)
+
 
 
 if __name__ == "__main__":
