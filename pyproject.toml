@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "classificationmodelconcurchatbot"
+version = "0.1.0"
+description = ""
+authors = ["Adam Pawełek <adam.pwk@outlook.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+openai = "^1.37.0"
+pypdf2 = "^3.0.1"
+pandas = "^2.2.2"
+openpyxl = "^3.1.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
