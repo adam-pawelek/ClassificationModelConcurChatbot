@@ -33,7 +33,7 @@ def generate_questions_from_text(text, num_questions=20):
     messages = [
         {"role": "system", "content": "Your job is to create questions based on the provided tutorial to Concur (you should ask questions which user would normally ask)."},
         {"role": "user",
-         "content": f"Generate {num_questions} questions based on the following text:\n{text}\nEnsure the response is in the following JSON format:\n[\n[{{\"role\": \"user\", \"content\": \"question 1\"}}],\n[{{\"role\": \"user\", \"content\": \"question 2\"}}],\n... \n]"}
+         "content": f"Generate {num_questions} questions based on the following text:\n{text}\nEnsure the response is in the following JSON format:\n[\n[{{\"role\": \"user\", \"content\": \"question 1\"}}],\n[{{\"role\": \"user\", \"content\": \"question 2\"}}],\n... \n] don't write ```json"}
     ]
 
     response = client.chat.completions.create(
@@ -46,23 +46,27 @@ def generate_questions_from_text(text, num_questions=20):
         print(response.choices[0].message.content)
         synthetic_data = json.loads(response.choices[0].message.content)
         print(synthetic_data)
+        return synthetic_data
     except json.JSONDecodeError:
-        print("Response not in JSON format. Asking ChatGPT to correct it.")
-        correction_messages = [
-            {"role": "system", "content": "Your job is to correct the format of the questions."},
-            {"role": "user",
-             "content": f"The previous response was not in the correct format. Ensure the response is in the following JSON format:\n[\n[{{\"role\": \"user\", \"content\": \"question 1\"}}],\n[{{\"role\": \"user\", \"content\": \"question 2\"}}],\n... \n]\nHere are the questions to reformat:\n{response.choices[0].message['content']}"}
-        ]
+        try:
+            print("Response not in JSON format. Asking ChatGPT to correct it.")
+            correction_messages = [
+                {"role": "system", "content": "Your job is to correct the format of the questions."},
+                {"role": "user",
+                 "content": f"The previous response was not in the correct format. Ensure the response is in the following JSON format:\n[\n[{{\"role\": \"user\", \"content\": \"question 1\"}}],\n[{{\"role\": \"user\", \"content\": \"question 2\"}}],\n... \n]\nHere are the questions to reformat:\n{response.choices[0].message['content']}  don't write ```json"}
+            ]
 
-        response = client.chat.completions.create(
-            model=CHATGPT_MODEL,
-            messages=correction_messages,
-            max_tokens=MAX_LENGTH,
-        )
+            response = client.chat.completions.create(
+                model=CHATGPT_MODEL,
+                messages=correction_messages,
+                max_tokens=MAX_LENGTH,
+            )
 
-        synthetic_data = json.loads(response.choices[0].message.content)
+            synthetic_data = json.loads(response.choices[0].message.content)
 
-    return synthetic_data
+            return synthetic_data
+        except Exception as e:
+            return []
 
 
 
@@ -93,20 +97,23 @@ def generate_follow_up_questions_from_text(history_conversation,text):
         synthetic_data = json.loads(response.choices[0].message.content)
         print(synthetic_data)
     except json.JSONDecodeError:
-        print("Response not in JSON format. Asking ChatGPT to correct it.")
-        correction_messages = [
-            {"role": "system", "content": "Your job is to correct the format of the questions."},
-            {"role": "user",
-             "content": f"The previous response was not in the correct format. Ensure the response is in the following JSON format:\n{{\"role\": \"user\", \"content\": \"question\"}}\nHere are the questions to reformat:\n{response.choices[0].message['content']}, (don't write ```json)"}
-        ]
+        try:
+            print("Response not in JSON format. Asking ChatGPT to correct it.")
+            correction_messages = [
+                {"role": "system", "content": "Your job is to correct the format of the questions."},
+                {"role": "user",
+                 "content": f"The previous response was not in the correct format. Ensure the response is in the following JSON format:\n{{\"role\": \"user\", \"content\": \"question\"}}\nHere are the questions to reformat:\n{response.choices[0].message['content']}, (don't write ```json)"}
+            ]
 
-        response = client.chat.completions.create(
-            model=CHATGPT_MODEL,
-            messages=correction_messages,
-            max_tokens=MAX_LENGTH,
-        )
+            response = client.chat.completions.create(
+                model=CHATGPT_MODEL,
+                messages=correction_messages,
+                max_tokens=MAX_LENGTH,
+            )
 
-        synthetic_data = json.loads(response.choices[0].message.content)
+            synthetic_data = json.loads(response.choices[0].message.content)
+        except Exception as e:
+            return {"role": "user", "content": "Tell me about Concur"}
 
     return synthetic_data
 
@@ -149,7 +156,7 @@ def create_answer(question, text):
             print(response.choices[0].message.content)
             synthetic_data = json.loads(response.choices[0].message.content)
             return synthetic_data
-        except json.JSONDecodeError:
+        except Exception as e:
             text = """
             {
                 "role": "system",
